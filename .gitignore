@@ -1,0 +1,21 @@
+# Ambiente
+turetta_core/.env
+turetta_core/vendor/
+
+# Storage
+turetta_core/storage/logs/*.log
+turetta_core/storage/cache/*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (caso use ferramentas de dev)
+node_modules/
