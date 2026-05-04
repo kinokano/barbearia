@@ -1,12 +1,14 @@
 <?php
-/**
- * Configuração CORS
- */
+
 return [
-    'allowed_origins' => [
-        env('APP_URL', '*'),
+    'paths' => [
+        'api' => env('CORS_API_PATH', 'api/*'),
     ],
-    'allowed_methods' => ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    'allowed_headers' => ['Content-Type', 'Authorization', 'X-Requested-With'],
-    'max_age'         => 3600,
+    'allowed_methods' => ['*'],
+    'allowed_origins' => explode(',', env('CORS_ALLOWED_ORIGINS', '*')),
+    'allowed_origins_patterns' => [],
+    'allowed_headers' => ['*'],
+    'exposed_headers' => [],
+    'max_age' => 0,
+    'supports_credentials' => true,
 ];
