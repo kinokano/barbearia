@@ -44,7 +44,16 @@ async function loadAppointments(date) {
     $('#agenda-empty').style.display = 'none';
 
     try {
-        const res = await fetch(`${API_BASE}/admin/appointments?data=${date}`);
+        const res = await fetch(`${API_BASE}/admin/appointments?data=${date}`, {
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        });
+        
+        if (res.status === 401 || res.status === 419) {
+            window.location.href = 'login.html';
+            return;
+        }
+        
         const data = await res.json();
 
         if (!data.length) {
@@ -83,7 +92,16 @@ async function loadClients() {
     $('#clients-empty').style.display = 'none';
 
     try {
-        const res = await fetch(`${API_BASE}/admin/clients`);
+        const res = await fetch(`${API_BASE}/admin/clients`, {
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        });
+        
+        if (res.status === 401 || res.status === 419) {
+            window.location.href = 'login.html';
+            return;
+        }
+
         const data = await res.json();
 
         if (!data.length) {
@@ -108,11 +126,24 @@ async function loadClients() {
 
 async function updateStatus(id, status) {
     try {
+        const token = document.cookie.split('; ').find(row => row.startsWith('XSRF-TOKEN='));
+        const csrf = token ? decodeURIComponent(token.split('=')[1]) : '';
+
         const res = await fetch(`${API_BASE}/admin/appointments/${id}/status`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json', 
+                'Accept': 'application/json',
+                'X-XSRF-TOKEN': csrf
+            },
+            credentials: 'same-origin',
             body: JSON.stringify({ status }),
         });
+
+        if (res.status === 401 || res.status === 419) {
+            window.location.href = 'login.html';
+            return;
+        }
 
         if (!res.ok) throw new Error();
         showToast('Status atualizado.');

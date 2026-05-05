@@ -5,11 +5,21 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\Professional;
 use App\Models\Service;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        if (User::count() === 0) {
+            User::create([
+                'nome' => 'Administrador',
+                'email' => 'admin@turetta.com',
+                'password' => Hash::make('admin123'),
+                'telefone' => '00000000000'
+            ]);
+        }
         Professional::insert([
             ['nome' => 'Carlos Turetta', 'created_at' => now(), 'updated_at' => now()],
             ['nome' => 'Rafael', 'created_at' => now(), 'updated_at' => now()],
