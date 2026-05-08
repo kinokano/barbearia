@@ -6,54 +6,50 @@ Sistema de agendamento online — Barbearia Turetta.
 
 | Camada | Tecnologia |
 |---|---|
-| Frontend | HTML5, CSS3, JavaScript (ES6+) |
-| Backend | Laravel 10 (PHP 8.1+) |
-| Banco de Dados | MySQL 8+ / MariaDB 10.4+ |
+| Backend | Laravel 13 (PHP 8.3+) |
+| Frontend | Blade Templates + Tailwind CSS (CDN) |
+| Banco de Dados | SQLite (dev) / MySQL 8+ (prod) |
 | Hosting | cPanel / HostGator |
 
-## Estrutura
+## Estrutura do Projeto
 
 ```
 barbearia/
 ├── public_html/              ← Document root (Apache/cPanel)
-│   ├── index.html            ← Página de agendamento
-│   ├── admin.html            ← Painel administrativo
-│   ├── css/
-│   │   └── style.css
-│   ├── js/
-│   │   ├── agendamento.js
-│   │   └── admin.js
-│   └── api/
-│       ├── index.php         ← Entry point Laravel
-│       └── .htaccess
+│   ├── index.php             ← Entry point → bootstrap do Laravel
+│   └── .htaccess
 │
-└── turetta_core/             ← Core Laravel (fora do document root)
+└── turetta/                  ← Core Laravel (fora do document root)
     ├── app/
-    │   ├── Console/
-    │   ├── Exceptions/
     │   ├── Http/
     │   │   ├── Controllers/
-    │   │   │   ├── AdminController.php
-    │   │   │   ├── AppointmentController.php
-    │   │   │   ├── ProfessionalController.php
-    │   │   │   └── ServiceController.php
-    │   │   └── Kernel.php
-    │   ├── Models/
-    │   │   ├── Appointment.php
-    │   │   ├── Professional.php
-    │   │   ├── Service.php
-    │   │   └── User.php
-    │   └── Providers/
-    ├── bootstrap/
-    ├── config/
+    │   │   │   ├── Auth/LoginController.php
+    │   │   │   ├── Admin/
+    │   │   │   │   ├── DashboardController.php
+    │   │   │   │   ├── ServiceController.php
+    │   │   │   │   ├── ProfessionalController.php
+    │   │   │   │   ├── ScheduleController.php
+    │   │   │   │   └── ClientController.php
+    │   │   │   ├── Professional/AgendaController.php
+    │   │   │   └── Client/BookingController.php
+    │   │   └── Middleware/RoleMiddleware.php
+    │   └── Models/
+    │       ├── Role.php
+    │       ├── User.php
+    │       ├── Service.php
+    │       ├── Professional.php
+    │       ├── Schedule.php
+    │       └── Appointment.php
     ├── database/
     │   ├── migrations/
     │   └── seeders/
-    ├── routes/
-    │   └── api.php
-    ├── .env.example
-    ├── artisan
-    └── composer.json
+    ├── resources/views/
+    │   ├── layouts/app.blade.php
+    │   ├── auth/login.blade.php
+    │   ├── admin/ (dashboard, services, professionals, schedules, clients)
+    │   ├── professional/ (agenda, appointment-detail)
+    │   └── client/ (booking step-by-step, success)
+    └── routes/web.php
 ```
 
 ## Setup Local
@@ -64,46 +60,53 @@ git clone https://github.com/seu-usuario/barbearia.git
 cd barbearia
 
 # 2. Instale dependências
-cd turetta_core && composer install && cd ..
+cd turetta && composer install && cd ..
 
 # 3. Configure o .env
-cp turetta_core/.env.example turetta_core/.env
-# Edite turetta_core/.env com credenciais do banco
+cp turetta/.env.example turetta/.env
 
 # 4. Gere a key
-cd turetta_core && php artisan key:generate && cd ..
+cd turetta && php artisan key:generate && cd ..
 
 # 5. Rode migrations + seed
-cd turetta_core && php artisan migrate --seed && cd ..
+cd turetta && php artisan migrate:fresh --seed && cd ..
 
 # 6. Inicie o servidor
-php -S localhost:8000 -t public_html
+cd turetta && php artisan serve
 ```
 
-## API Endpoints
+## Credenciais de Acesso (Dev)
 
-| Método | Rota | Descrição |
+| Papel | E-mail | Senha |
 |---|---|---|
-| GET | `/api/professionals` | Lista profissionais |
-| GET | `/api/services` | Lista serviços |
-| GET | `/api/slots?data=YYYY-MM-DD&professional_id=N` | Horários disponíveis |
-| POST | `/api/appointments` | Criar agendamento |
-| GET | `/api/admin/appointments?data=YYYY-MM-DD` | Agenda do dia |
-| GET | `/api/admin/clients` | Lista de clientes |
-| PATCH | `/api/admin/appointments/{id}/status` | Atualizar status |
+| Admin | admin@turetta.com | turetta2026 |
+| Profissional | joao@turetta.com | turetta2026 |
+
+## Funcionalidades
+
+### Booking Público (`/agendar`)
+- Step 1: Escolher serviço
+- Step 2: Escolher profissional (filtrado pelo serviço)
+- Step 3: Escolher data e horário (AJAX, slots disponíveis)
+- Step 4: Confirmar com dados pessoais
+
+### Admin (`/admin`)
+- Agenda global com filtro por data
+- CRUD de Serviços, Profissionais e Horários
+- CRM de Clientes com link WhatsApp
+- Alteração de status de agendamentos (pendente/agendado/cancelado)
+
+### Profissional (`/profissional`)
+- Agenda pessoal filtrada por data
+- Detalhes do agendamento com dados do cliente
 
 ## Deploy HostGator
 
-1. Faça upload de `turetta_core/` para fora do `public_html` (ex: `/home/user/turetta_core/`)
-2. Faça upload do conteúdo de `public_html/` para `/home/user/public_html/`
-3. Edite `public_html/api/index.php` — ajuste o caminho do autoload:
-   ```php
-   require __DIR__.'/../../turetta_core/vendor/autoload.php';
-   $app = require_once __DIR__.'/../../turetta_core/bootstrap/app.php';
-   ```
-4. Configure `.env` em `turetta_core/` com credenciais MySQL do cPanel
-5. Execute via SSH: `cd ~/turetta_core && php artisan migrate --seed`
-6. Gere a key: `cd ~/turetta_core && php artisan key:generate`
+1. Upload `turetta/` para `/home/user/turetta/`
+2. Upload conteúdo de `public_html/` para `/home/user/public_html/`
+3. Configure `.env` em `turetta/` com credenciais MySQL
+4. Via SSH: `cd ~/turetta && php artisan migrate --seed`
+5. Via SSH: `cd ~/turetta && php artisan key:generate`
 
 ## Licença
 
