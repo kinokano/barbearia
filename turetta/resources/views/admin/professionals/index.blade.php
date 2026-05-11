@@ -21,7 +21,11 @@
             @foreach($professionals as $prof)
                 <div class="glass rounded-2xl p-6 hover-lift">
                     <div class="flex items-center gap-3 mb-4">
-                        <div class="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center text-sm font-bold text-zinc-400 uppercase">{{ mb_substr($prof->user->name, 0, 2) }}</div>
+                        @if($prof->profile_photo)
+                            <img src="{{ Storage::url($prof->profile_photo) }}" alt="{{ $prof->user->name }}" class="w-12 h-12 rounded-full object-cover border border-zinc-700">
+                        @else
+                            <div class="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center text-sm font-bold text-zinc-400 uppercase">{{ mb_substr($prof->user->name, 0, 2) }}</div>
+                        @endif
                         <div>
                             <h3 class="text-lg font-semibold text-white">{{ $prof->user->name }}</h3>
                             <p class="text-zinc-500 text-xs">{{ $prof->specialty ?? 'Barbeiro' }}</p>

@@ -50,23 +50,61 @@ class BookingController extends Controller
      */
     public function selectSlot(Service $service, Professional $professional): View
     {
+        $weekOffset = (int) request('week', 0);
+        $today      = Carbon::today();
+        $weekStart  = $today->copy()->startOfWeek(Carbon::MONDAY)->addWeeks($weekOffset);
+        $weekEnd    = $weekStart->copy()->addDays(6);
+
+        if ($weekStart->lt($today)) {
+            $weekStart = $today;
+        }
+
+        $scheduledDays = Schedule::where('professional_id', $professional->id)
+            ->pluck('day_of_week')
+            ->toArray();
+
+        $days = [];
+        $cursor = $weekStart->copy();
+        $realWeekStart = $today->copy()->startOfWeek(Carbon::MONDAY)->addWeeks($weekOffset);
+        while ($cursor->lte($weekEnd)) {
+            $days[] = [
+                'date'      => $cursor->format('Y-m-d'),
+                'day'       => $cursor->day,
+                'label'     => mb_strtoupper(mb_substr($cursor->locale('pt_BR')->dayName, 0, 3)),
+                'available' => in_array($cursor->dayOfWeek, $scheduledDays) && $cursor->gte($today),
+                'past'      => $cursor->lt($today),
+            ];
+            $cursor->addDay();
+        }
+
+        $paddedDays = [];
+        $firstDayOfWeek = $realWeekStart->copy();
+        while ($firstDayOfWeek->lt($weekStart)) {
+            $paddedDays[] = [
+                'date'      => $firstDayOfWeek->format('Y-m-d'),
+                'day'       => $firstDayOfWeek->day,
+                'label'     => mb_strtoupper(mb_substr($firstDayOfWeek->locale('pt_BR')->dayName, 0, 3)),
+                'available' => false,
+                'past'      => true,
+            ];
+            $firstDayOfWeek->addDay();
+        }
+        $days = array_merge($paddedDays, $days);
+
         return view('client.booking', [
             'step'         => 3,
             'service'      => $service,
             'professional' => $professional,
+            'days'         => $days,
+            'weekOffset'   => $weekOffset,
+            'weekLabel'    => $realWeekStart->format('d') . ' ' . mb_strtoupper(mb_substr($realWeekStart->locale('pt_BR')->monthName, 0, 3)) . ' — ' . $weekEnd->format('d') . ' ' . mb_strtoupper(mb_substr($weekEnd->locale('pt_BR')->monthName, 0, 3)),
+            'canGoPrev'    => $weekOffset > 0,
         ]);
     }
 
     /**
-     * AJAX: Retorna os horários disponíveis de um profissional em uma data.
-     *
-     * Lógica:
-     * 1. Busca o Schedule do profissional para o day_of_week da data
-     * 2. Gera slots de 30 em 30 min dentro do horário de trabalho
-     *    (cada slot tem duração = duração do serviço)
-     * 3. Busca appointments existentes para aquele profissional + data (não cancelados)
-     * 4. Remove qualquer slot cujo período [start, start+duração] colida com um agendamento
-     * 5. Retorna apenas slots disponíveis
+     * AJAX: Retorna todos os horários de um profissional em uma data,
+     * marcando cada um como disponível ou ocupado.
      */
     public function getAvailableSlots(Request $request): JsonResponse
     {
@@ -79,9 +117,8 @@ class BookingController extends Controller
         $date           = Carbon::parse($request->input('date'));
         $professionalId = (int) $request->input('professional_id');
         $service        = Service::findOrFail($request->input('service_id'));
-        $dayOfWeek      = $date->dayOfWeek; // 0 = Domingo
+        $dayOfWeek      = $date->dayOfWeek;
 
-        // 1. Busca o horário de trabalho do profissional naquele dia
         $schedule = Schedule::where('professional_id', $professionalId)
             ->where('day_of_week', $dayOfWeek)
             ->first();
@@ -93,7 +130,6 @@ class BookingController extends Controller
             ]);
         }
 
-        // 2. Gera slots de 30 em 30 min; cada slot tem janela = duração do serviço
         $cursor   = Carbon::parse($schedule->start_time);
         $endTime  = Carbon::parse($schedule->end_time);
         $duration = $service->duration_minutes;
@@ -104,34 +140,37 @@ class BookingController extends Controller
                 'start' => $cursor->format('H:i'),
                 'end'   => $cursor->copy()->addMinutes($duration)->format('H:i'),
             ];
-            $cursor->addMinutes(30); // passo fixo de 30 minutos
+            $cursor->addMinutes(30);
         }
 
-        // 3. Busca agendamentos existentes (não cancelados) com whereDate para garantir match correto
         $existingAppointments = Appointment::where('professional_id', $professionalId)
             ->whereDate('date', $date->format('Y-m-d'))
             ->where('status', '!=', 'cancelado')
             ->get(['start_time', 'end_time']);
 
-        // 4. Filtra slots que colidem com qualquer agendamento existente
-        //    Colisão: slot.start < appt.end  E  slot.end > appt.start
-        $availableSlots = collect($allSlots)->filter(function ($slot) use ($existingAppointments) {
+        $slots = collect($allSlots)->map(function ($slot) use ($existingAppointments) {
             $slotStart = Carbon::parse($slot['start']);
             $slotEnd   = Carbon::parse($slot['end']);
+            $available = true;
 
             foreach ($existingAppointments as $appointment) {
                 $apptStart = Carbon::parse($appointment->start_time);
                 $apptEnd   = Carbon::parse($appointment->end_time);
 
                 if ($slotStart->lt($apptEnd) && $slotEnd->gt($apptStart)) {
-                    return false; // Colisão detectada → slot indisponível
+                    $available = false;
+                    break;
                 }
             }
 
-            return true;
+            return [
+                'start'     => $slot['start'],
+                'end'       => $slot['end'],
+                'available' => $available,
+            ];
         })->values();
 
-        return response()->json(['slots' => $availableSlots]);
+        return response()->json(['slots' => $slots]);
     }
 
     /**

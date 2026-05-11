@@ -63,9 +63,13 @@
                 @foreach($professionals as $prof)
                     <a href="{{ route('client.booking.slot', [$service, $prof]) }}" class="glass rounded-2xl p-6 hover-lift block group">
                         <div class="flex items-center gap-4">
-                            <div class="w-14 h-14 bg-zinc-800 rounded-full flex items-center justify-center text-lg font-bold text-zinc-400 uppercase group-hover:bg-white group-hover:text-black transition-smooth">
-                                {{ mb_substr($prof->user->name, 0, 2) }}
-                            </div>
+                            @if($prof->profile_photo)
+                                <img src="{{ Storage::url($prof->profile_photo) }}" alt="{{ $prof->user->name }}" class="w-14 h-14 rounded-full object-cover border border-zinc-700 transition-smooth group-hover:border-white">
+                            @else
+                                <div class="w-14 h-14 bg-zinc-800 rounded-full flex items-center justify-center text-lg font-bold text-zinc-400 uppercase group-hover:bg-white group-hover:text-black transition-smooth">
+                                    {{ mb_substr($prof->user->name, 0, 2) }}
+                                </div>
+                            @endif
                             <div>
                                 <h3 class="text-lg font-semibold text-white">{{ $prof->user->name }}</h3>
                                 <p class="text-zinc-500 text-sm">{{ $prof->specialty ?? 'Barbeiro' }}</p>
@@ -83,32 +87,123 @@
 
     {{-- Step 3: Data e Horário --}}
     @if($step === 3)
-        <div class="text-center mb-8">
-            <h1 class="text-2xl font-bold tracking-tight">Escolha data e horário</h1>
-            <p class="text-zinc-500 text-sm mt-2">{{ $service->name }} com <strong class="text-white">{{ $professional->user->name }}</strong></p>
-        </div>
-
-        <div class="glass rounded-2xl p-8">
-            <div class="mb-6">
-                <label for="booking-date" class="block text-sm font-medium text-zinc-300 mb-2">Data</label>
-                <input type="date" id="booking-date" min="{{ now()->format('Y-m-d') }}" class="w-full px-4 py-3 bg-zinc-900/80 border border-zinc-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/20 text-sm">
+        <div x-data="{
+            selectedDate: null,
+            slots: [],
+            loading: false,
+            noSlots: false,
+            errorMsg: '',
+            serviceId: {{ $service->id }},
+            professionalId: {{ $professional->id }},
+            async loadSlots(date) {
+                this.selectedDate = date;
+                this.slots = [];
+                this.loading = true;
+                this.noSlots = false;
+                this.errorMsg = '';
+                try {
+                    const res = await fetch(`{{ route('client.booking.slots') }}?date=${date}&professional_id=${this.professionalId}&service_id=${this.serviceId}`);
+                    const data = await res.json();
+                    this.loading = false;
+                    if (data.slots.length === 0) {
+                        this.noSlots = true;
+                        this.errorMsg = data.message || 'Nenhum horário disponível para esta data.';
+                    } else {
+                        this.slots = data.slots;
+                    }
+                } catch (e) {
+                    this.loading = false;
+                    this.noSlots = true;
+                    this.errorMsg = 'Erro ao carregar horários. Tente novamente.';
+                }
+            },
+            slotUrl(slot) {
+                return `{{ route('client.booking.confirm') }}?service_id=${this.serviceId}&professional_id=${this.professionalId}&date=${this.selectedDate}&start_time=${slot.start}&end_time=${slot.end}`;
+            }
+        }">
+            <div class="mb-8">
+                <h1 class="text-2xl font-bold tracking-tight text-white">Escolha o horário</h1>
+                <p class="text-zinc-500 text-sm mt-1">Selecione uma data e horário disponível</p>
             </div>
 
-            <div id="slots-container" class="hidden">
-                <p class="text-sm font-medium text-zinc-300 mb-3">Horários disponíveis</p>
-                <div id="slots-grid" class="grid grid-cols-3 sm:grid-cols-4 gap-2"></div>
-                <p id="slots-empty" class="text-zinc-500 text-sm text-center py-6 hidden">Nenhum horário disponível para esta data.</p>
-                <div id="slots-loading" class="text-center py-6 hidden">
-                    <div class="inline-flex items-center gap-2 text-zinc-400 text-sm">
-                        <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                        Carregando...
+            {{-- Seletor de Semana --}}
+            <div class="flex items-center justify-between mb-5">
+                @if($canGoPrev)
+                    <a href="{{ route('client.booking.slot', [$service, $professional, 'week' => $weekOffset - 1]) }}"
+                       class="w-10 h-10 flex items-center justify-center rounded-lg border border-zinc-700/60 text-zinc-400 hover:text-white hover:border-zinc-500 transition-smooth">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                    </a>
+                @else
+                    <div class="w-10 h-10 flex items-center justify-center rounded-lg border border-zinc-800/40 text-zinc-700 cursor-not-allowed">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
                     </div>
+                @endif
+
+                <span class="text-sm font-semibold text-white tracking-wide">{{ $weekLabel }}</span>
+
+                <a href="{{ route('client.booking.slot', [$service, $professional, 'week' => $weekOffset + 1]) }}"
+                   class="w-10 h-10 flex items-center justify-center rounded-lg border border-zinc-700/60 text-zinc-400 hover:text-white hover:border-zinc-500 transition-smooth">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </a>
+            </div>
+
+            {{-- Cards de Dias --}}
+            <div class="grid grid-cols-7 gap-2 mb-8">
+                @foreach($days as $d)
+                    @if($d['available'])
+                        <button @click="loadSlots('{{ $d['date'] }}')"
+                                :class="selectedDate === '{{ $d['date'] }}'
+                                    ? 'border-yellow-600/60 bg-zinc-800/80 ring-1 ring-yellow-700/30'
+                                    : 'border-zinc-700/50 bg-zinc-900/60 hover:border-zinc-500'"
+                                class="relative flex flex-col items-center justify-center py-3 rounded-xl border transition-smooth cursor-pointer">
+                            <span class="text-[11px] font-medium tracking-wider"
+                                  :class="selectedDate === '{{ $d['date'] }}' ? 'text-yellow-200/80' : 'text-zinc-400'">{{ $d['label'] }}</span>
+                            <span class="text-lg font-bold mt-0.5"
+                                  :class="selectedDate === '{{ $d['date'] }}' ? 'text-white' : 'text-zinc-200'">{{ $d['day'] }}</span>
+                            <span x-show="selectedDate === '{{ $d['date'] }}'" class="absolute bottom-1.5 w-1 h-1 rounded-full bg-yellow-500/80"></span>
+                        </button>
+                    @else
+                        <div class="flex flex-col items-center justify-center py-3 rounded-xl border border-zinc-800/30 bg-zinc-900/30 opacity-40 cursor-not-allowed select-none">
+                            <span class="text-[11px] font-medium tracking-wider text-zinc-600">{{ $d['label'] }}</span>
+                            <span class="text-lg font-bold mt-0.5 text-zinc-600">{{ $d['day'] }}</span>
+                        </div>
+                    @endif
+                @endforeach
+            </div>
+
+            {{-- Horários --}}
+            <div x-show="selectedDate" x-cloak>
+                <p class="text-xs font-semibold text-zinc-500 tracking-widest uppercase mb-4">Horários Disponíveis</p>
+
+                <div x-show="loading" class="flex items-center justify-center py-8">
+                    <svg class="animate-spin w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                </div>
+
+                <div x-show="noSlots && !loading" class="text-center py-8">
+                    <p class="text-zinc-500 text-sm" x-text="errorMsg"></p>
+                </div>
+
+                <div x-show="slots.length > 0 && !loading" class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                    <template x-for="slot in slots" :key="slot.start">
+                        <template x-if="slot.available">
+                            <a :href="slotUrl(slot)"
+                               class="px-3 py-3.5 bg-zinc-800/70 border border-zinc-700/40 rounded-xl text-center text-sm font-mono font-semibold text-white hover:bg-zinc-700 hover:border-zinc-500 active:scale-95 transition-smooth cursor-pointer"
+                               x-text="slot.start"></a>
+                        </template>
+                        <template x-if="!slot.available">
+                            <div class="px-3 py-3.5 bg-zinc-900/40 border border-zinc-800/30 rounded-xl text-center text-sm font-mono text-zinc-600 line-through opacity-50 cursor-not-allowed select-none"
+                                 x-text="slot.start"></div>
+                        </template>
+                    </template>
                 </div>
             </div>
-        </div>
 
-        <div class="text-center mt-6">
-            <a href="{{ route('client.booking.professional', $service) }}" class="text-sm text-zinc-500 hover:text-white transition-smooth">← Voltar aos profissionais</a>
+            <div class="text-center mt-8">
+                <a href="{{ route('client.booking.professional', $service) }}" class="text-sm text-zinc-500 hover:text-white transition-smooth">← Voltar aos profissionais</a>
+            </div>
         </div>
     @endif
 
@@ -163,7 +258,7 @@
                     </div>
                     <div>
                         <label for="client_birth_date" class="block text-sm font-medium text-zinc-300 mb-2">Data de nascimento</label>
-                        <input type="date" id="client_birth_date" name="client_birth_date" value="{{ old('client_birth_date', auth()->user()?->birth_date?->format('Y-m-d') ?? '') }}" class="w-full px-4 py-3 bg-zinc-900/80 border border-zinc-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/20 text-sm">
+                        <input type="text" id="client_birth_date" name="client_birth_date" value="{{ old('client_birth_date', auth()->user()?->birth_date?->format('Y-m-d') ?? '') }}" placeholder="Selecione uma data..." class="w-full px-4 py-3 bg-zinc-900/80 border border-zinc-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/20 text-sm cursor-pointer">
                     </div>
                 </div>
 
@@ -175,53 +270,18 @@
     @endif
 </div>
 
-@if($step === 3)
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const dateInput     = document.getElementById('booking-date');
-    const container     = document.getElementById('slots-container');
-    const grid          = document.getElementById('slots-grid');
-    const emptyMsg      = document.getElementById('slots-empty');
-    const loadingMsg    = document.getElementById('slots-loading');
-    const serviceId     = {{ $service->id }};
-    const professionalId = {{ $professional->id }};
-
-    dateInput.addEventListener('change', async function() {
-        const date = this.value;
-        if (!date) return;
-
-        container.classList.remove('hidden');
-        grid.innerHTML = '';
-        emptyMsg.classList.add('hidden');
-        loadingMsg.classList.remove('hidden');
-
-        try {
-            const res = await fetch(`{{ route('client.booking.slots') }}?date=${date}&professional_id=${professionalId}&service_id=${serviceId}`);
-            const data = await res.json();
-            loadingMsg.classList.add('hidden');
-
-            if (data.slots.length === 0) {
-                emptyMsg.textContent = data.message || 'Nenhum horário disponível para esta data.';
-                emptyMsg.classList.remove('hidden');
-                return;
-            }
-
-            data.slots.forEach(slot => {
-                const btn = document.createElement('a');
-                btn.href = `{{ route('client.booking.confirm') }}?service_id=${serviceId}&professional_id=${professionalId}&date=${date}&start_time=${slot.start}&end_time=${slot.end}`;
-                btn.className = 'px-3 py-3 border border-zinc-700 rounded-xl text-center text-sm font-mono text-white hover:bg-white hover:text-black transition-smooth cursor-pointer';
-                btn.textContent = slot.start;
-                grid.appendChild(btn);
-            });
-        } catch (err) {
-            loadingMsg.classList.add('hidden');
-            emptyMsg.textContent = 'Erro ao carregar horários. Tente novamente.';
-            emptyMsg.classList.remove('hidden');
-        }
-    });
+    if (document.getElementById('client_birth_date')) {
+        flatpickr("#client_birth_date", {
+            locale: "pt",
+            dateFormat: "Y-m-d",
+            maxDate: "today",
+            disableMobile: "true"
+        });
+    }
 });
 </script>
 @endpush
-@endif
 @endsection

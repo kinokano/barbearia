@@ -75,6 +75,7 @@ Route::prefix('admin')->middleware(['auth', 'role:1'])->group(function () {
 
     // Gerenciamento de status dos agendamentos (DashboardController)
     Route::patch('/appointments/{appointment}/status', [DashboardController::class, 'updateStatus'])->name('admin.appointments.status');
+    Route::delete('/appointments/{appointment}', [DashboardController::class, 'destroy'])->name('admin.appointments.destroy');
 });
 
 // ─── Profissional (role_id = 2) ──────────────────────────────────────────

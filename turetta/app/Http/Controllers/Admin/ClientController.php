@@ -16,6 +16,7 @@ class ClientController extends Controller
     public function index(Request $request): View
     {
         $search = $request->input('search');
+        $filter = $request->input('filter');
 
         // Agrupa por telefone (identificador do cliente público)
         $clientsQuery = Appointment::query()
@@ -35,9 +36,29 @@ class ClientController extends Controller
             });
         }
 
+        if ($filter) {
+            switch ($filter) {
+                case '7_days':
+                    $targetDate = now()->subDays(7)->format('Y-m-d');
+                    $clientsQuery->havingRaw('DATE(MAX(date)) = ?', [$targetDate]);
+                    break;
+                case '14_days':
+                    $targetDate = now()->subDays(14)->format('Y-m-d');
+                    $clientsQuery->havingRaw('DATE(MAX(date)) = ?', [$targetDate]);
+                    break;
+                case '30_days':
+                    $targetDate = now()->subDays(30)->format('Y-m-d');
+                    $clientsQuery->havingRaw('DATE(MAX(date)) = ?', [$targetDate]);
+                    break;
+                case 'birthdays':
+                    $clientsQuery->whereMonth('client_birth_date', now()->month);
+                    break;
+            }
+        }
+
         $clients = $clientsQuery->paginate(20);
 
-        return view('admin.clients', compact('clients', 'search'));
+        return view('admin.clients', compact('clients', 'search', 'filter'));
     }
 
     /**

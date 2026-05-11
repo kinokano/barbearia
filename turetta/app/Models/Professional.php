@@ -13,6 +13,7 @@ class Professional extends Model
         'user_id',
         'specialty',
         'active',
+        'profile_photo',
     ];
 
     protected function casts(): array

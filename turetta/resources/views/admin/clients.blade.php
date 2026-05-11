@@ -26,6 +26,27 @@
         </form>
     </div>
 
+    {{-- Filtros CRM --}}
+    <div class="flex flex-wrap items-center gap-2 mb-6">
+        @php
+            $currentFilter = $filter ?? '';
+            $filters = [
+                ''          => 'Todos',
+                '7_days'    => 'Último serviço a 7 dias',
+                '14_days'   => 'Último serviço a 14 dias',
+                '30_days'   => 'Último serviço a 30 dias',
+                'birthdays' => 'Aniversariantes do Mês',
+            ];
+        @endphp
+
+        @foreach($filters as $key => $label)
+            <a href="{{ route('admin.clients', ['filter' => $key, 'search' => $search ?? '']) }}"
+               class="px-4 py-2 rounded-xl text-sm font-medium transition-smooth border {{ $currentFilter === $key ? 'bg-white text-black border-white' : 'bg-zinc-900 border-zinc-700/50 text-zinc-300 hover:bg-zinc-800 hover:text-white' }}">
+                {{ $label }}
+            </a>
+        @endforeach
+    </div>
+
     {{-- Tabela CRM --}}
     @if($clients->isEmpty())
         <div class="glass rounded-2xl p-12 text-center">
